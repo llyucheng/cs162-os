@@ -26,6 +26,11 @@ pid_t shell_pgid;
 
 int cmd_exit(struct tokens *tokens);
 int cmd_help(struct tokens *tokens);
+int cmd_pwd(struct tokens *tokens);
+int cmd_cd(struct tokens *tokens);
+int cmd_exec(struct tokens *tokens);
+void cmd_exec_helper(char *str, struct tokens *tokens);
+int cmd_cout(char *res, char *out);
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens *tokens);
@@ -40,6 +45,8 @@ typedef struct fun_desc {
 fun_desc_t cmd_table[] = {
   {cmd_help, "?", "show this help menu"},
   {cmd_exit, "exit", "exit the command shell"},
+  {cmd_pwd, "pwd", ""},
+  {cmd_cd, "cd", ""}
 };
 
 /* Prints a helpful description for the given command */
@@ -52,6 +59,52 @@ int cmd_help(struct tokens *tokens) {
 /* Exits this shell */
 int cmd_exit(struct tokens *tokens) {
   exit(0);
+}
+
+int cmd_pwd(struct tokens *tokens) {
+  char cwd[1024];
+  if (getcwd(cwd, sizeof(cwd)) != NULL)
+    fprintf(stdout, "%s\n", cwd);
+  return 1;
+}
+
+int cmd_cd(struct tokens *tokens) {
+  chdir(tokens_get_token(tokens, 1));
+  return 1;
+}
+
+int cmd_exec(struct tokens *tokens) {
+  /* execv(tokens_get_token(tokens, 0), tokens->tokens); */
+  cmd_exec_helper(tokens_get_token(tokens, 0), tokens);
+  char *path = getenv("PATH");
+  char *pch;
+  pch = strtok (path, ":");
+  while (pch != NULL) {
+    char *str = malloc(100);
+    strcat(str, pch);
+    strcat(str, "/");
+    strcat(str, tokens_get_token(tokens, 0));
+    pch = strtok(NULL, ":");
+    /* char *argv[] = {tokens_get_token(tokens, 0), tokens_get_token(tokens, 1), NULL}; */
+    cmd_exec_helper(str, tokens);  
+  }
+  return 1;
+}
+
+void cmd_exec_helper(char *str, struct tokens *tokens) {
+  char *argv[tokens_get_length(tokens) + 1];
+  int i = 0;
+  for (; i < tokens_get_length(tokens); i++) {
+    argv[i] = tokens_get_token(tokens, i);
+  }
+  argv[tokens_get_length(tokens)] = NULL;
+  execv(str, argv);
+}
+
+int cmd_cout(char *res, char *out) {
+  FILE *f = fopen(out, "w");
+  fprintf(f, res);
+  return 1;
 }
 
 /* Looks up the built-in command, if it exists. */
@@ -101,7 +154,6 @@ int main(int argc, char *argv[]) {
   while (fgets(line, 4096, stdin)) {
     /* Split our line into words. */
     struct tokens *tokens = tokenize(line);
-
     /* Find which built-in function to run. */
     int fundex = lookup(tokens_get_token(tokens, 0));
 
@@ -109,7 +161,16 @@ int main(int argc, char *argv[]) {
       cmd_table[fundex].fun(tokens);
     } else {
       /* REPLACE this to run commands as programs. */
-      fprintf(stdout, "This shell doesn't know how to run programs.\n");
+      pid_t fpid;
+      int status;
+      if (fork() == 0) {
+        cmd_exec(tokens);
+        
+        /* execl(tokens_get_token(tokens, 0), tokens_get_token(tokens, 0), tokens_get_token(tokens, 1), NULL);  */
+      } else {
+        fpid = wait(&status);
+      }
+      /* fprintf(stdout, "This shell doesn't know how to run programs.\n"); */
     }
 
     if (shell_is_interactive)
