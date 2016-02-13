@@ -3,6 +3,11 @@
 *.ko
 *.obj
 *.elf
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
 
 # Precompiled Headers
 *.gch
@@ -36,3 +41,23 @@
 hw0/main
 hw0/map
 hw0/wc
+=======
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+>>>>>>> ae33eee2a10998e351f258634ee6e866ad39ed5d
