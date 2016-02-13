@@ -74,7 +74,6 @@ int cmd_cd(struct tokens *tokens) {
 }
 
 int cmd_exec(struct tokens *tokens) {
-  /* execv(tokens_get_token(tokens, 0), tokens->tokens); */
   cmd_exec_helper(tokens_get_token(tokens, 0), tokens);
   char *path = getenv("PATH");
   char *pch;
@@ -85,7 +84,6 @@ int cmd_exec(struct tokens *tokens) {
     strcat(str, "/");
     strcat(str, tokens_get_token(tokens, 0));
     pch = strtok(NULL, ":");
-    /* char *argv[] = {tokens_get_token(tokens, 0), tokens_get_token(tokens, 1), NULL}; */
     cmd_exec_helper(str, tokens);  
   }
   return 1;
