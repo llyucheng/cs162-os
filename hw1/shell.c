@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "tokenizer.h"
 
@@ -34,6 +35,9 @@ void cmd_output_direction(char *argv[], char *filename);
 void cmd_input_direction(char *argv[], char *filename);
 int detect_out_direction(struct tokens *tokens);
 int detect_in_direction(struct tokens *tokens);
+void signal_ignore();
+void signal_default();
+
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens *tokens);
@@ -175,6 +179,12 @@ int detect_in_direction(struct tokens *tokens) {
   return -1;
 }
 
+void signal_handling(pid_t pid, int signum) {
+  if (signum == 2) {
+    kill(pid, signum);
+  }
+}
+
 /* Looks up the built-in command, if it exists. */
 int lookup(char cmd[]) {
   for (int i = 0; i < sizeof(cmd_table) / sizeof(fun_desc_t); i++)
@@ -191,6 +201,26 @@ void cmd_input_direction(char *argv[], char *filename) {
     execvp(argv[0], argv);
   }
 
+}
+
+void signal_ignore() {
+  signal(SIGINT, SIG_IGN);
+  signal(SIGQUIT, SIG_IGN);
+  signal(SIGKILL, SIG_IGN);
+  signal(SIGTERM, SIG_IGN);
+  signal(SIGTSTP, SIG_IGN);
+  signal(SIGTTIN, SIG_IGN);
+  signal(SIGTTOU, SIG_IGN);
+}
+
+void signal_default() {
+  signal(SIGINT, SIG_DFL);
+  signal(SIGQUIT, SIG_DFL);
+  signal(SIGKILL, SIG_DFL);
+  signal(SIGTERM, SIG_DFL);
+  signal(SIGTSTP, SIG_DFL);
+  signal(SIGTTIN, SIG_DFL);
+  signal(SIGTTOU, SIG_DFL);
 }
 
 /* Intialization procedures for this shell */
@@ -228,6 +258,8 @@ int main(int argc, char *argv[]) {
   /* Please only print shell prompts when standard input is not a tty */
   if (shell_is_interactive)
     fprintf(stdout, "%d: ", line_num);
+  
+  signal_ignore();
 
   while (fgets(line, 4096, stdin)) {
     /* Split our line into words. */
@@ -242,8 +274,10 @@ int main(int argc, char *argv[]) {
       pid_t fpid;
       int status;
       if (fork() == 0) {
+        signal_default();
         cmd_exec(tokens);
       } else {
+        signal_ignore();
         fpid = wait(&status);
       }
     }
