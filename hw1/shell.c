@@ -37,7 +37,8 @@ int detect_out_direction(struct tokens *tokens);
 int detect_in_direction(struct tokens *tokens);
 void signal_ignore();
 void signal_default();
-
+bool detect_background_proce(struct tokens *tokens);
+void cmd_exec_background(struct tokens *tokens);
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens *tokens);
@@ -126,6 +127,10 @@ void cmd_exec_helper(char *str, struct tokens *tokens) {
   }
   argv[tokens_get_length(tokens)] = NULL;
   execv(str, argv);
+}
+
+void cmd_exec_background(struct tokens *tokens) {
+  //TODO need refactor exec code
 }
 
 int detect_out_direction(struct tokens *tokens) {
@@ -217,6 +222,14 @@ void signal_default() {
   signal(SIGTTOU, SIG_DFL);
 }
 
+bool detect_background_proce(struct tokens *tokens) {
+  if (strcmp(tokens_get_token(tokens, tokens_get_length(tokens) - 1), "&") == 0) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 /* Intialization procedures for this shell */
 void init_shell() {
   /* Our shell is connected to standard input. */
@@ -267,12 +280,21 @@ int main(int argc, char *argv[]) {
       /* REPLACE this to run commands as programs. */
       pid_t fpid;
       int status;
+      bool background = false;
       if (fork() == 0) {
         signal_default();
-        cmd_exec(tokens);
+        if (detect_background_proce(tokens)) {
+          background = true;
+
+        } else {
+          cmd_exec(tokens);
+        }
       } else {
         signal_ignore();
-        fpid = wait(&status);
+        if (!background) {
+          fpid = wait(&status);
+        }
+        background = false;
       }
     }
 
