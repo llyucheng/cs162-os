@@ -179,12 +179,6 @@ int detect_in_direction(struct tokens *tokens) {
   return -1;
 }
 
-void signal_handling(pid_t pid, int signum) {
-  if (signum == 2) {
-    kill(pid, signum);
-  }
-}
-
 /* Looks up the built-in command, if it exists. */
 int lookup(char cmd[]) {
   for (int i = 0; i < sizeof(cmd_table) / sizeof(fun_desc_t); i++)
