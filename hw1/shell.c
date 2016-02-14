@@ -30,7 +30,10 @@ int cmd_pwd(struct tokens *tokens);
 int cmd_cd(struct tokens *tokens);
 int cmd_exec(struct tokens *tokens);
 void cmd_exec_helper(char *str, struct tokens *tokens);
-int cmd_cout(char *res, char *out);
+int cmd_output_direction(char *argv[], char *filename);
+int cmd_input_direction(char *str, char *filename);
+int detect_out_direction(struct tokens *tokens);
+int detect_in_direction(struct tokens *tokens);
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens *tokens);
@@ -74,17 +77,32 @@ int cmd_cd(struct tokens *tokens) {
 }
 
 int cmd_exec(struct tokens *tokens) {
-  cmd_exec_helper(tokens_get_token(tokens, 0), tokens);
-  char *path = getenv("PATH");
-  char *pch;
-  pch = strtok (path, ":");
-  while (pch != NULL) {
-    char *str = malloc(100);
-    strcat(str, pch);
-    strcat(str, "/");
-    strcat(str, tokens_get_token(tokens, 0));
-    pch = strtok(NULL, ":");
-    cmd_exec_helper(str, tokens);  
+  int out = detect_out_direction(tokens);
+  int in = detect_in_direction(tokens);
+  if (out != -1) {
+    char *argv[out + 1];
+    int j;
+    for (j = 0; j < out; j++) {
+      argv[j] = tokens_get_token(tokens, j);
+    }
+    argv[out] = NULL;
+    char *filename = tokens_get_token(tokens, out + 1);
+    cmd_output_direction(argv, filename);
+  } else if (in != -1) {
+  
+  } else {
+    cmd_exec_helper(tokens_get_token(tokens, 0), tokens);
+    char *path = getenv("PATH");
+    char *pch;
+    pch = strtok(path, ":");
+    while (pch != NULL) {
+      char *str = malloc(100);
+      strcat(str, pch);
+      strcat(str, "/");
+      strcat(str, tokens_get_token(tokens, 0));
+      pch = strtok(NULL, ":");
+      cmd_exec_helper(str, tokens);  
+    }
   }
   return 1;
 }
@@ -99,10 +117,56 @@ void cmd_exec_helper(char *str, struct tokens *tokens) {
   execv(str, argv);
 }
 
-int cmd_cout(char *res, char *out) {
-  FILE *f = fopen(out, "w");
-  fprintf(f, res);
+int detect_out_direction(struct tokens *tokens) {
+  int i = 0;
+  for (; i < tokens_get_length(tokens); i++) {
+    if (strcmp(tokens_get_token(tokens, i), ">") == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int cmd_output_direction(char *argv[], char *filename) {
+  int pipefd[2];
+  pipe(pipefd);
+  if (fork() == 0) {
+    close(pipefd[0]);
+    dup2(pipefd[1], 1);  // send stdout to the pipe
+    dup2(pipefd[1], 2);
+    close(pipefd[1]); 
+    execv(argv[0], argv);
+    char *path = getenv("PATH");
+    char *pch;
+    pch = strtok(path, ":");
+    while (pch != NULL) {
+      char *str = malloc(100);
+      strcat(str, pch);
+      strcat(str, "/");
+      strcat(str, argv[0]);
+      pch = strtok(NULL, ":");
+      execv(str, argv);  
+    }
+  } else {
+    char buffer[1024];
+    close(pipefd[1]);
+    while (read(pipefd[0], buffer, sizeof(buffer)) != 0) {
+      FILE *f = fopen(filename, "w");
+      fputs(buffer, f);
+      fclose(f);
+    }
+  }
   return 1;
+}
+
+int detect_in_direction(struct tokens *tokens) {
+  int i = 0;
+  for (; i < tokens_get_length(tokens); i++) {
+    if (strcmp(tokens_get_token(tokens, i), "<") == 0) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 /* Looks up the built-in command, if it exists. */
@@ -163,12 +227,9 @@ int main(int argc, char *argv[]) {
       int status;
       if (fork() == 0) {
         cmd_exec(tokens);
-        
-        /* execl(tokens_get_token(tokens, 0), tokens_get_token(tokens, 0), tokens_get_token(tokens, 1), NULL);  */
       } else {
         fpid = wait(&status);
       }
-      /* fprintf(stdout, "This shell doesn't know how to run programs.\n"); */
     }
 
     if (shell_is_interactive)
