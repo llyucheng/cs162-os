@@ -30,8 +30,8 @@ int cmd_pwd(struct tokens *tokens);
 int cmd_cd(struct tokens *tokens);
 int cmd_exec(struct tokens *tokens);
 void cmd_exec_helper(char *str, struct tokens *tokens);
-int cmd_output_direction(char *argv[], char *filename);
-int cmd_input_direction(char *str, char *filename);
+void cmd_output_direction(char *argv[], char *filename);
+void cmd_input_direction(char *argv[], char *filename);
 int detect_out_direction(struct tokens *tokens);
 int detect_in_direction(struct tokens *tokens);
 
@@ -89,7 +89,14 @@ int cmd_exec(struct tokens *tokens) {
     char *filename = tokens_get_token(tokens, out + 1);
     cmd_output_direction(argv, filename);
   } else if (in != -1) {
-  
+    char *argv[in + 1];
+    int j;
+    for (j = 0; j < in; j++) {
+      argv[j] = tokens_get_token(tokens, j);
+    }
+    argv[in] = NULL;
+    char *filename = tokens_get_token(tokens, in + 1);
+    cmd_input_direction(argv, filename);
   } else {
     cmd_exec_helper(tokens_get_token(tokens, 0), tokens);
     char *path = getenv("PATH");
@@ -127,12 +134,12 @@ int detect_out_direction(struct tokens *tokens) {
   return -1;
 }
 
-int cmd_output_direction(char *argv[], char *filename) {
+void cmd_output_direction(char *argv[], char *filename) {
   int pipefd[2];
   pipe(pipefd);
   if (fork() == 0) {
     close(pipefd[0]);
-    dup2(pipefd[1], 1);  // send stdout to the pipe
+    dup2(pipefd[1], 1);
     dup2(pipefd[1], 2);
     close(pipefd[1]); 
     execv(argv[0], argv);
@@ -156,7 +163,6 @@ int cmd_output_direction(char *argv[], char *filename) {
       fclose(f);
     }
   }
-  return 1;
 }
 
 int detect_in_direction(struct tokens *tokens) {
@@ -175,6 +181,16 @@ int lookup(char cmd[]) {
     if (cmd && (strcmp(cmd_table[i].cmd, cmd) == 0))
       return i;
   return -1;
+}
+
+void cmd_input_direction(char *argv[], char *filename) {
+  if (fork() == 0) {
+    FILE *f = fopen(filename, "r");
+    dup2(fileno(f),fileno(stdin));
+    fclose(f);
+    execvp(argv[0], argv);
+  }
+
 }
 
 /* Intialization procedures for this shell */
