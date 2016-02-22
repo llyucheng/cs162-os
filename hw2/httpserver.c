@@ -28,7 +28,7 @@ char *server_files_directory;
 char *server_proxy_hostname;
 int server_proxy_port;
 
-void send_file_content(char *path, int fd);
+void send_file_content(FILE *file, char *type, int fd);
 /*
  * Reads an HTTP request from stream (fd), and writes an HTTP response
  * containing:
@@ -50,17 +50,26 @@ void handle_files_request(int fd)
   char *path = strcat(server_files_directory, request->path);
   if (stat(path, &s) == 0) {
     if(s.st_mode & S_IFREG) {
-      send_file_content(path, fd);
+      FILE *file = fopen(path, "r");
+      if (file != NULL) {
+        char *type = http_get_mime_type(path);
+        send_file_content(file, type, fd);
+      }
+      
     } else if (s.st_mode & S_IFDIR) {
       char *file_path =  strcat(path, "/index.html");
-      send_file_content(file_path, fd);
+      FILE *file = fopen(file_path, "r");
+      if (file != NULL) {
+        char *type = http_get_mime_type(file_path);
+        send_file_content(file, type, fd);
+      } else {
+
+      }
     }
   }
 }
 
-void send_file_content(char *path, int fd) {
-  FILE *file = fopen(path, "r"); 
-  char *type = http_get_mime_type(path);
+void send_file_content(FILE *file, char *type, int fd) {
   http_start_response(fd, 200);
   http_send_header(fd, "Content-type", type);
   http_end_headers(fd);
