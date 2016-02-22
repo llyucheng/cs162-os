@@ -95,8 +95,14 @@ void handle_files_request(int fd)
           http_send_string(fd, tmp);
         }
         closedir(dirp);
-      }
-    }
+      } 
+    } 
+  } else {
+    http_start_response(fd, 404);
+    http_send_header(fd, "Content-type", "text/html");
+    http_end_headers(fd);     
+    http_send_string(fd, "<html><body>No Page Found</body></html>");
+    close(fd);
   }
 }
 
