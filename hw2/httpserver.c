@@ -29,6 +29,7 @@ char *server_proxy_hostname;
 int server_proxy_port;
 
 void send_file_content(FILE *file, char *type, int fd);
+
 /*
  * Reads an HTTP request from stream (fd), and writes an HTTP response
  * containing:
@@ -48,6 +49,8 @@ void handle_files_request(int fd)
   struct http_request *request = http_request_parse(fd);
   struct stat s;
   char *path = strcat(server_files_directory, request->path);
+  char *path_backup = malloc(1 + strlen(path));
+  strcpy(path_backup, path);
   if (stat(path, &s) == 0) {
     if(s.st_mode & S_IFREG) {
       FILE *file = fopen(path, "r");
@@ -55,7 +58,6 @@ void handle_files_request(int fd)
         char *type = http_get_mime_type(path);
         send_file_content(file, type, fd);
       }
-      
     } else if (s.st_mode & S_IFDIR) {
       char *file_path =  strcat(path, "/index.html");
       FILE *file = fopen(file_path, "r");
@@ -63,7 +65,36 @@ void handle_files_request(int fd)
         char *type = http_get_mime_type(file_path);
         send_file_content(file, type, fd);
       } else {
-
+        http_start_response(fd, 200);
+        http_send_header(fd, "Content-type", "text/html");
+        http_end_headers(fd);
+        DIR *dirp;  
+        struct dirent *direntp; 
+        dirp = opendir(path_backup);
+        while ((direntp = readdir(dirp)) != NULL) {  
+          char *file_name = direntp->d_name;
+          if (strcmp(file_name, ".") == 0) {
+            continue;
+          }
+          if (strcmp(direntp->d_name, "..") == 0) {
+            file_name = "Parent directory";
+          }
+          char tmp[100];
+          memset(tmp, '\0', sizeof(tmp));
+          char *head = "<p><a href=\"";
+          strcpy(tmp, head);
+          strcat(tmp, direntp->d_name);
+          if (strcmp(direntp->d_name, "..") == 0) {
+            strcat(tmp, "/\">");
+          } else {
+            strcat(tmp, "\">");
+          }
+          strcat (tmp, file_name);
+          char *tail = "</a></p>";
+          strcat (tmp, tail);
+          http_send_string(fd, tmp);
+        }
+        closedir(dirp);
       }
     }
   }
