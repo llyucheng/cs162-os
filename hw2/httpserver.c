@@ -142,8 +142,41 @@ void handle_proxy_request(int fd)
   sin.sin_addr.s_addr = inet_addr(ip_address);
   sin.sin_port = htons(server_proxy_port);
   int sd = socket(AF_INET, SOCK_STREAM, 0);
-  while (connect(sd, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
-    fprintf(stdout, "%s\n", "ERROR connecting");
+  connect(sd, (struct sockaddr*)&sin, sizeof(sin)); 
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    char buffer[1024];
+    int num_bytes_read;
+    int num_bytes_write;
+    while (1) {
+      num_bytes_read = read(sd, buffer, sizeof(buffer));
+      if (num_bytes_read > 0) {
+        num_bytes_write = write(fd, buffer, num_bytes_read);
+        if (num_bytes_write < 0) {
+          break;
+        }
+      } else {
+        break;
+      }
+      close(sd);
+    }
+  } else {
+    char buffer[1024];
+    int num_bytes_read;
+    int num_bytes_write;
+    while (1) {
+      num_bytes_read = read(fd, buffer, sizeof(buffer));
+      if (num_bytes_read > 0) {
+        num_bytes_write = write(sd, buffer, num_bytes_read);
+        if (num_bytes_write < 0) {
+          break;
+        }
+      } else {
+        break;
+      }
+      close(fd);
+    }
   }
 }
 
