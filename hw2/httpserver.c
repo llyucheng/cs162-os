@@ -130,9 +130,21 @@ void send_file_content(FILE *file, char *type, int fd) {
  */
 void handle_proxy_request(int fd)
 {
+  struct hostent *host;
+  struct in_addr **addr_list;
+  host = gethostbyname(server_proxy_hostname);
+  addr_list = (struct in_addr **)host->h_addr_list;
+  char *ip_address = inet_ntoa(*addr_list[0]);
 
-  /* YOUR CODE HERE */
-
+  struct sockaddr_in sin;
+  bzero(&sin,sizeof(sin));
+  sin.sin_family = AF_INET;
+  sin.sin_addr.s_addr = inet_addr(ip_address);
+  sin.sin_port = htons(server_proxy_port);
+  int sd = socket(AF_INET, SOCK_STREAM, 0);
+  while (connect(sd, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
+    fprintf(stdout, "%s\n", "ERROR connecting");
+  }
 }
 
 /*
